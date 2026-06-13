@@ -43,6 +43,28 @@ services:
       timeout: 5s
       retries: 5
 
+  clickhouse:
+    image: "clickhouse/clickhouse-server:24.8"
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_DB=warehouse
+      - CLICKHOUSE_USER=gbsynth
+      - CLICKHOUSE_PASSWORD=gbsynth
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    ports:
+      # HTTP interface; the loader connects here and GrowthBook would too (PLAN.md:82-84).
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    volumes:
+      - chdata:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   growthbook:
     image: "growthbook/growthbook:4.4.0"
     restart: unless-stopped
@@ -64,4 +86,5 @@ services:
 volumes:
   mongodata:
   pgdata:
+  chdata:
   uploads:

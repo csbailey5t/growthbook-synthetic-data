@@ -68,8 +68,15 @@ def cmd_generate(args: argparse.Namespace) -> int:
 def cmd_load(args: argparse.Namespace) -> int:
     dataset = _build(args)
     ok = _report(dataset)
-    counts = load_dataset(dataset, args.dsn)
-    print("\nLoaded into Postgres:")
+    if args.warehouse == "clickhouse":
+        from gbsynth.load.clickhouse import load_dataset as ch_load
+
+        counts = ch_load(dataset)
+        target = "ClickHouse"
+    else:
+        counts = load_dataset(dataset, args.dsn)
+        target = "Postgres"
+    print(f"\nLoaded into {target}:")
     for name, n in counts.items():
         print(f"  {name:<18} {n:,} rows")
     if not ok:
@@ -114,6 +121,12 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--spec", help="explicit path to a vertical YAML (overrides vertical)")
         if name == "load":
             p.add_argument("--dsn", help="Postgres DSN (default: local compose warehouse)")
+            p.add_argument(
+                "--warehouse",
+                choices=["postgres", "clickhouse"],
+                default="postgres",
+                help="target warehouse (default: postgres)",
+            )
         p.set_defaults(func=func)
 
     args = parser.parse_args(argv)
