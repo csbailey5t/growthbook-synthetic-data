@@ -11,6 +11,8 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass
 
+import psycopg
+
 from gbsynth.build import build_dataset
 from gbsynth.load.postgres import load_dataset
 from gbsynth.provision import config
@@ -34,13 +36,25 @@ class ProvisionReport:
         return all(e.ok for e in self.experiments)
 
 
+def _ensure_database(db: str) -> None:
+    """Create the vertical's warehouse database if it doesn't exist (CREATE has no IF NOT
+    EXISTS, so check pg_database first)."""
+    with psycopg.connect(config.admin_dsn(), autocommit=True) as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db,))
+        if cur.fetchone() is None:
+            # db is the vertical name from our own spec (trusted, not user input).
+            cur.execute(f'CREATE DATABASE "{db}"')  # ty: ignore[no-matching-overload]
+
+
 def provision(spec: VerticalSpec, now: dt.datetime | None = None) -> ProvisionReport:
     now = now or dt.datetime.now(dt.UTC).replace(microsecond=0)
+    warehouse_db = spec.name  # one database per vertical
 
     dataset = build_dataset(spec, now)
-    loaded = load_dataset(dataset, config.LOADER_DSN)
+    _ensure_database(warehouse_db)
+    loaded = load_dataset(dataset, config.loader_dsn(warehouse_db))
 
-    datasource_id, assignment_query_id = bootstrap_datasource()
+    datasource_id, assignment_query_id = bootstrap_datasource(spec.name, warehouse_db)
 
     client = GBClient(config.GB_API_HOST, config.GB_API_KEY)
     project_id = ensure_project(client, f"gbsynth: {spec.name}")

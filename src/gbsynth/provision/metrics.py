@@ -11,24 +11,27 @@ from __future__ import annotations
 from gbsynth.provision.client import GBClient
 from gbsynth.spec import VerticalSpec
 
-FACT_TABLE_ID = "ft_saas_tracks"
+
+def fact_table_id(vertical: str) -> str:
+    return f"ft_{vertical}_tracks"
 
 
-def _metric_id(key: str) -> str:
-    return f"fact__saas_{key}"
+def metric_id(vertical: str, key: str) -> str:
+    return f"fact__{vertical}_{key}"
 
 
 def import_metrics(
     client: GBClient, project_id: str, datasource_id: str, spec: VerticalSpec
 ) -> dict[str, str]:
     """Upsert the fact table + metrics; return {metric_key: metric_id}."""
+    fact_table = fact_table_id(spec.name)
     fact_metrics = []
     metric_ids: dict[str, str] = {}
     for m in spec.metrics:
-        mid = _metric_id(m.key)
+        mid = metric_id(spec.name, m.key)
         metric_ids[m.key] = mid
         numerator: dict = {
-            "factTableId": FACT_TABLE_ID,
+            "factTableId": fact_table,
             "rowFilters": [{"operator": "=", "column": "event", "values": [m.event]}],
         }
         if m.type == "proportion":
@@ -52,9 +55,9 @@ def import_metrics(
     payload = {
         "factTables": [
             {
-                "id": FACT_TABLE_ID,
+                "id": fact_table,
                 "data": {
-                    "name": "SaaS Tracks",
+                    "name": f"{spec.name} tracks",
                     "datasource": datasource_id,
                     "projects": [project_id],
                     "userIdTypes": ["user_id"],

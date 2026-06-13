@@ -36,21 +36,31 @@ MONGO_URI = os.environ.get(
 )
 MONGO_DB = "growthbook"
 
-# Warehouse as the developer's machine reaches it (loader runs from the host).
-WAREHOUSE_DB = os.environ.get("POSTGRES_DB", "warehouse")
-LOADER_DSN = (
-    f"host=localhost port=5432 dbname={WAREHOUSE_DB} "
-    f"user={os.environ.get('POSTGRES_USER', 'gbsynth')} "
-    f"password={os.environ.get('POSTGRES_PASSWORD', 'gbsynth')}"
-)
+# Each vertical gets its own warehouse database so all four can coexist in one org with
+# identically-named tables (experiment_viewed/tracks/...). The default compose database
+# ("warehouse") is the maintenance db used to create the per-vertical ones.
+PG_USER = os.environ.get("POSTGRES_USER", "gbsynth")
+PG_PASSWORD = os.environ.get("POSTGRES_PASSWORD", "gbsynth")
+PG_INTERNAL_HOST = os.environ.get("POSTGRES_INTERNAL_HOST", "postgres")  # as GrowthBook sees it
+ADMIN_DB = os.environ.get("POSTGRES_DB", "warehouse")
 
-# Warehouse as GrowthBook reaches it (over the compose network). These params are what
-# bootstrap.py encrypts into the data-source document.
-DATASOURCE_PARAMS = {
-    "host": os.environ.get("POSTGRES_INTERNAL_HOST", "postgres"),
-    "port": 5432,
-    "database": WAREHOUSE_DB,
-    "user": os.environ.get("POSTGRES_USER", "gbsynth"),
-    "password": os.environ.get("POSTGRES_PASSWORD", "gbsynth"),
-    "defaultSchema": "public",
-}
+
+def loader_dsn(db: str) -> str:
+    """Warehouse DSN as the developer's machine reaches it (loader runs from the host)."""
+    return f"host=localhost port=5432 dbname={db} user={PG_USER} password={PG_PASSWORD}"
+
+
+def admin_dsn() -> str:
+    return loader_dsn(ADMIN_DB)
+
+
+def datasource_params(db: str) -> dict:
+    """Connection params GrowthBook uses (over the compose network); bootstrap encrypts these."""
+    return {
+        "host": PG_INTERNAL_HOST,
+        "port": 5432,
+        "database": db,
+        "user": PG_USER,
+        "password": PG_PASSWORD,
+        "defaultSchema": "public",
+    }

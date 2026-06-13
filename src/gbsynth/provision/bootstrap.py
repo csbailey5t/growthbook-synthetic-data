@@ -21,7 +21,10 @@ from pymongo import MongoClient
 
 from gbsynth.provision import config, crypto
 
-DATASOURCE_NAME = "gbsynth SaaS Warehouse"
+
+def _datasource_name(vertical: str) -> str:
+    return f"gbsynth {vertical} Warehouse"
+
 
 # Segment auto-config shape, captured from a real UI-created data source in Phase 0.
 _SEGMENT_SETTINGS = {
@@ -89,8 +92,12 @@ def _user_id_query(settings: dict) -> str:
     return settings["queries"]["exposure"][0]["id"]
 
 
-def bootstrap_datasource() -> tuple[str, str]:
-    """Ensure the SaaS data source exists in Mongo; return (datasource_id, query_id)."""
+def bootstrap_datasource(vertical: str, warehouse_db: str) -> tuple[str, str]:
+    """Ensure the vertical's data source exists in Mongo; return (datasource_id, query_id).
+
+    Each vertical points at its own warehouse database, so the four coexist in one org.
+    """
+    name = _datasource_name(vertical)
     client: MongoClient = MongoClient(config.MONGO_URI)
     try:
         db = client[config.MONGO_DB]
@@ -101,25 +108,24 @@ def bootstrap_datasource() -> tuple[str, str]:
             )
         org_id = org["id"]
 
-        existing = db.datasources.find_one({"organization": org_id, "name": DATASOURCE_NAME})
+        existing = db.datasources.find_one({"organization": org_id, "name": name})
         if existing is not None:
             return existing["id"], _user_id_query(existing["settings"])
 
         now = dt.datetime.now(dt.UTC)
         ds_id = "ds_" + uuid.uuid4().hex[:13]
+        params = json.dumps(config.datasource_params(warehouse_db))
         db.datasources.insert_one(
             {
                 "_id": ObjectId(),
                 "id": ds_id,
-                "name": DATASOURCE_NAME,
-                "description": "Seeded by gbsynth bootstrap (Phase 2).",
+                "name": name,
+                "description": "Seeded by gbsynth bootstrap.",
                 "organization": org_id,
                 "dateCreated": now,
                 "dateUpdated": now,
                 "type": "postgres",
-                "params": crypto.encrypt(
-                    json.dumps(config.DATASOURCE_PARAMS), config.ENCRYPTION_KEY
-                ),
+                "params": crypto.encrypt(params, config.ENCRYPTION_KEY),
                 "projects": [],
                 "settings": _SEGMENT_SETTINGS,
                 "__v": 0,
