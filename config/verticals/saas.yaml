@@ -1,0 +1,87 @@
+# SaaS vertical — Phase 1 thin slice.
+# One hand-scripted story (onboarding checklist = win). Pricing-page (surprise loss) and
+# paywall-timing (running, flat) stories + procedural backfill are added after the slice
+# validates end-to-end through gbstats.
+
+name: saas
+seed: 42
+schema_flavor: segment
+
+scale:
+  n_users: 25000
+  months: 12
+
+# Activation-rate spread across personas keeps the blended rate organic and gives
+# CUPED something to bite on later (per-user propensity scales these).
+personas:
+  - name: smb
+    weight: 0.55
+    activation_base: 0.34
+    mrr_log_mean: 3.4   # ~ $30/mo median
+    mrr_log_std: 0.5
+  - name: mid_market
+    weight: 0.35
+    activation_base: 0.45
+    mrr_log_mean: 4.6   # ~ $100/mo median
+    mrr_log_std: 0.5
+  - name: enterprise
+    weight: 0.10
+    activation_base: 0.52
+    mrr_log_mean: 5.9   # ~ $365/mo median
+    mrr_log_std: 0.6
+
+metrics:
+  - key: activation
+    name: Trial activation
+    type: proportion
+    event: activated
+  - key: mrr
+    name: MRR per user
+    type: mean
+    event: subscribed
+    value_column: value
+
+# Stories expose disjoint signup cohorts (non-overlapping windows), so no user is in two
+# experiments. One is live (paywall, ends_days_ago: 0); the rest are backdated + stopped.
+# The solver finds the lift that lands each target chance-to-win at the real sample size.
+stories:
+  # Live, mid-flight, inconclusive so far — the always-something-running demo moment.
+  - key: saas-paywall-timing
+    name: Paywall timing
+    ends_days_ago: 0
+    phase_days: 40
+    primary_metric: activation
+    target_chance_to_win: 0.50   # flat / inconclusive (not asserted)
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+
+  # Clear winner, recently concluded.
+  - key: saas-onboarding-checklist
+    name: Onboarding checklist
+    ends_days_ago: 45
+    phase_days: 55
+    primary_metric: activation
+    target_chance_to_win: 0.97   # win
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+
+  # Surprise loss — looked promising, hurt activation, stopped.
+  - key: saas-pricing-page
+    name: Pricing page redesign
+    ends_days_ago: 105
+    phase_days: 55
+    primary_metric: activation
+    target_chance_to_win: 0.05   # loss
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+
+# Procedural history: small experiments drawn from a prior, mostly flat.
+backfill:
+  count: 5
+  phase_days: 30
+  starts_days_ago: 160
+  lift_std: 0.05
+  primary_metric: activation
