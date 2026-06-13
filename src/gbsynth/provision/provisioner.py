@@ -48,15 +48,22 @@ def _ensure_database(db: str) -> None:
             cur.execute(f'CREATE DATABASE "{db}"')  # ty: ignore[no-matching-overload]
 
 
-def provision(spec: VerticalSpec, now: dt.datetime | None = None) -> ProvisionReport:
+def provision(
+    spec: VerticalSpec, now: dt.datetime | None = None, warehouse: str = "postgres"
+) -> ProvisionReport:
     now = now or dt.datetime.now(dt.UTC).replace(microsecond=0)
     warehouse_db = spec.name  # one database per vertical
 
     dataset = build_dataset(spec, now)
-    _ensure_database(warehouse_db)
-    loaded = load_dataset(dataset, config.loader_dsn(warehouse_db))
+    if warehouse == "clickhouse":
+        from gbsynth.load.clickhouse import load_dataset as ch_load
 
-    datasource_id, assignment_query_id = bootstrap_datasource(spec.name, warehouse_db)
+        loaded = ch_load(dataset, database=warehouse_db)
+    else:
+        _ensure_database(warehouse_db)
+        loaded = load_dataset(dataset, config.loader_dsn(warehouse_db))
+
+    datasource_id, assignment_query_id = bootstrap_datasource(spec.name, warehouse_db, warehouse)
 
     client = GBClient(config.GB_API_HOST, config.GB_API_KEY)
     project_id = ensure_project(client, f"gbsynth: {spec.name}")

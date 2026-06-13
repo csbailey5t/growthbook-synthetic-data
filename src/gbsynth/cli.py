@@ -88,8 +88,8 @@ def cmd_provision(args: argparse.Namespace) -> int:
     from gbsynth.provision.provisioner import provision
 
     spec = VerticalSpec.from_yaml(_spec_path(args))
-    print(f"Provisioning '{spec.name}' into GrowthBook...")
-    report = provision(spec)
+    print(f"Provisioning '{spec.name}' into GrowthBook ({args.warehouse})...")
+    report = provision(spec, warehouse=args.warehouse)
     print(f"\nProject {report.project_id}  ·  data source {report.datasource_id}")
     print("Loaded:", ", ".join(f"{k}={v:,}" for k, v in report.loaded.items()))
     print(f"Feature flags created: {report.features_created}")
@@ -180,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--spec", help="explicit path to a vertical YAML (overrides vertical)")
         if name == "load":
             p.add_argument("--dsn", help="Postgres DSN (default: local compose warehouse)")
+        if name in ("load", "provision"):
             p.add_argument(
                 "--warehouse",
                 choices=["postgres", "clickhouse"],

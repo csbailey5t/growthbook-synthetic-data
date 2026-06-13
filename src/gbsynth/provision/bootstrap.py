@@ -26,44 +26,7 @@ def _datasource_name(vertical: str) -> str:
     return f"gbsynth {vertical} Warehouse"
 
 
-# Segment auto-config shape, captured from a real UI-created data source in Phase 0.
-_SEGMENT_SETTINGS = {
-    "schemaFormat": "segment",
-    "userIdTypes": [
-        {"userIdType": "anonymous_id", "description": "Anonymous visitor id"},
-        {"userIdType": "user_id", "description": "Logged-in user id"},
-    ],
-    "queries": {
-        "exposure": [
-            {
-                "id": "anonymous_id",
-                "userIdType": "anonymous_id",
-                "dimensions": ["source", "medium", "device", "browser"],
-                "name": "Anonymous Visitors",
-                "description": "",
-                "query": "",  # set below
-            },
-            {
-                "id": "user_id",
-                "userIdType": "user_id",
-                "dimensions": ["source", "medium", "device", "browser"],
-                "name": "Logged-in Users",
-                "description": "",
-                "query": "",  # set below
-            },
-        ],
-        "identityJoins": [
-            {
-                "ids": ["user_id", "anonymous_id"],
-                "query": "SELECT\n  user_id,\n  anonymous_id\nFROM\n  public.identifies",
-            }
-        ],
-    },
-    "schemaOptions": {"exposureTableName": "experiment_viewed"},
-}
-
-
-def _exposure_sql(id_col: str) -> str:
+def _exposure_sql(id_col: str, exposure_table: str) -> str:
     return (
         f"SELECT\n  {id_col},\n  received_at as timestamp,\n  experiment_id,\n"
         "  variation_id,\n  context_campaign_source as source,\n"
@@ -75,13 +38,56 @@ def _exposure_sql(id_col: str) -> str:
         "    WHEN context_user_agent LIKE '% Edg%' THEN 'Edge'\n"
         "    WHEN context_user_agent LIKE '% Chrome%' THEN 'Chrome'\n"
         "    WHEN context_user_agent LIKE '% Safari%' THEN 'Safari'\n"
-        "    ELSE 'Other' END\n  ) as browser\nFROM\n  public.experiment_viewed\n"
+        f"    ELSE 'Other' END\n  ) as browser\nFROM\n  {exposure_table}\n"
         f"WHERE\n  {id_col} is not null"
     )
 
 
-_SEGMENT_SETTINGS["queries"]["exposure"][0]["query"] = _exposure_sql("anonymous_id")
-_SEGMENT_SETTINGS["queries"]["exposure"][1]["query"] = _exposure_sql("user_id")
+def _segment_settings(exposure_table: str, identifies_table: str) -> dict:
+    """Segment-shape settings. Table refs are schema-qualified for Postgres (public.*) but
+    bare for ClickHouse, which has no `public` schema."""
+    return {
+        "schemaFormat": "segment",
+        "userIdTypes": [
+            {"userIdType": "anonymous_id", "description": "Anonymous visitor id"},
+            {"userIdType": "user_id", "description": "Logged-in user id"},
+        ],
+        "queries": {
+            "exposure": [
+                {
+                    "id": "anonymous_id",
+                    "userIdType": "anonymous_id",
+                    "dimensions": ["source", "medium", "device", "browser"],
+                    "name": "Anonymous Visitors",
+                    "description": "",
+                    "query": _exposure_sql("anonymous_id", exposure_table),
+                },
+                {
+                    "id": "user_id",
+                    "userIdType": "user_id",
+                    "dimensions": ["source", "medium", "device", "browser"],
+                    "name": "Logged-in Users",
+                    "description": "",
+                    "query": _exposure_sql("user_id", exposure_table),
+                },
+            ],
+            "identityJoins": [
+                {
+                    "ids": ["user_id", "anonymous_id"],
+                    "query": f"SELECT\n  user_id,\n  anonymous_id\nFROM\n  {identifies_table}",
+                }
+            ],
+        },
+        "schemaOptions": {"exposureTableName": "experiment_viewed"},
+    }
+
+
+def _settings_and_params(warehouse_type: str, warehouse_db: str) -> tuple[dict, str]:
+    if warehouse_type == "clickhouse":
+        settings = _segment_settings("experiment_viewed", "identifies")
+        return settings, json.dumps(config.clickhouse_params(warehouse_db))
+    settings = _segment_settings("public.experiment_viewed", "public.identifies")
+    return settings, json.dumps(config.datasource_params(warehouse_db))
 
 
 def _user_id_query(settings: dict) -> str:
@@ -92,12 +98,15 @@ def _user_id_query(settings: dict) -> str:
     return settings["queries"]["exposure"][0]["id"]
 
 
-def bootstrap_datasource(vertical: str, warehouse_db: str) -> tuple[str, str]:
+def bootstrap_datasource(
+    vertical: str, warehouse_db: str, warehouse_type: str = "postgres"
+) -> tuple[str, str]:
     """Ensure the vertical's data source exists in Mongo; return (datasource_id, query_id).
 
     Each vertical points at its own warehouse database, so the four coexist in one org.
     """
     name = _datasource_name(vertical)
+    settings, params = _settings_and_params(warehouse_type, warehouse_db)
     client: MongoClient = MongoClient(config.MONGO_URI)
     try:
         db = client[config.MONGO_DB]
@@ -114,7 +123,6 @@ def bootstrap_datasource(vertical: str, warehouse_db: str) -> tuple[str, str]:
 
         now = dt.datetime.now(dt.UTC)
         ds_id = "ds_" + uuid.uuid4().hex[:13]
-        params = json.dumps(config.datasource_params(warehouse_db))
         db.datasources.insert_one(
             {
                 "_id": ObjectId(),
@@ -124,13 +132,13 @@ def bootstrap_datasource(vertical: str, warehouse_db: str) -> tuple[str, str]:
                 "organization": org_id,
                 "dateCreated": now,
                 "dateUpdated": now,
-                "type": "postgres",
+                "type": warehouse_type,
                 "params": crypto.encrypt(params, config.ENCRYPTION_KEY),
                 "projects": [],
-                "settings": _SEGMENT_SETTINGS,
+                "settings": settings,
                 "__v": 0,
             }
         )
-        return ds_id, _user_id_query(_SEGMENT_SETTINGS)
+        return ds_id, _user_id_query(settings)
     finally:
         client.close()

@@ -55,7 +55,7 @@ def admin_dsn() -> str:
 
 
 def datasource_params(db: str) -> dict:
-    """Connection params GrowthBook uses (over the compose network); bootstrap encrypts these."""
+    """Postgres connection params GrowthBook uses (over the compose network)."""
     return {
         "host": PG_INTERNAL_HOST,
         "port": 5432,
@@ -63,4 +63,20 @@ def datasource_params(db: str) -> dict:
         "user": PG_USER,
         "password": PG_PASSWORD,
         "defaultSchema": "public",
+    }
+
+
+# ClickHouse, as GrowthBook reaches it over the compose network (HTTP :8123).
+CH_INTERNAL_HOST = os.environ.get("CLICKHOUSE_INTERNAL_HOST", "clickhouse")
+CH_USER = os.environ.get("CLICKHOUSE_USER", "gbsynth")
+CH_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD", "gbsynth")
+
+
+def clickhouse_params(db: str) -> dict:
+    return {
+        "host": CH_INTERNAL_HOST,
+        "port": 8123,
+        "user": CH_USER,
+        "password": CH_PASSWORD,
+        "database": db,
     }

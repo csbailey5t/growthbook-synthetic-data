@@ -29,14 +29,26 @@ _TYPE_MAP = {
 }
 
 
-def default_client() -> Client:
+def _conn(database: str) -> Client:
     return Client(
         host=os.environ.get("CLICKHOUSE_HOST", "localhost"),
         port=int(os.environ.get("CLICKHOUSE_PORT", "9000")),
         user=os.environ.get("CLICKHOUSE_USER", "gbsynth"),
         password=os.environ.get("CLICKHOUSE_PASSWORD", "gbsynth"),
-        database=os.environ.get("CLICKHOUSE_DB", "warehouse"),
+        database=database,
     )
+
+
+def default_client() -> Client:
+    return _conn(os.environ.get("CLICKHOUSE_DB", "warehouse"))
+
+
+def ensure_database(database: str) -> Client:
+    """Create the database if needed and return a client bound to it."""
+    admin = _conn("default")
+    admin.execute(f"CREATE DATABASE IF NOT EXISTS `{database}`")
+    admin.disconnect()
+    return _conn(database)
 
 
 def _ch_type(pg_type: str, nullable: bool) -> str:
@@ -61,9 +73,16 @@ def _create(client: Client, table: Table) -> dict[str, bool]:
     return nullable
 
 
-def load_dataset(dataset: Dataset, client: Client | None = None) -> dict[str, int]:
-    """Load all tables into ClickHouse; returns {table_name: row_count}."""
-    client = client or default_client()
+def load_dataset(
+    dataset: Dataset, client: Client | None = None, database: str | None = None
+) -> dict[str, int]:
+    """Load all tables into ClickHouse; returns {table_name: row_count}.
+
+    Pass `database` to load into a per-vertical database (created if missing); otherwise
+    uses the env default.
+    """
+    if client is None:
+        client = ensure_database(database) if database else default_client()
     counts: dict[str, int] = {}
     for table in dataset.tables:
         _create(client, table)
