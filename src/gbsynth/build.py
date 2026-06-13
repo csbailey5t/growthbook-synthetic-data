@@ -84,6 +84,7 @@ def build_dataset(spec: VerticalSpec, now: dt.datetime | None = None) -> Dataset
                 "key": story.key,
                 "name": story.name,
                 "status": story.status,
+                "story": story,
                 "n_exposed": len(exposures),
                 "planned_n": n_per_arm,
                 "resolved_lift": lift,

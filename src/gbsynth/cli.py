@@ -77,11 +77,38 @@ def cmd_load(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_provision(args: argparse.Namespace) -> int:
+    from gbsynth.provision.provisioner import provision
+
+    spec = VerticalSpec.from_yaml(_spec_path(args))
+    print(f"Provisioning '{spec.name}' into GrowthBook...")
+    report = provision(spec)
+    print(f"\nProject {report.project_id}  ·  data source {report.datasource_id}")
+    print("Loaded:", ", ".join(f"{k}={v:,}" for k, v in report.loaded.items()))
+    print("\nExperiments (live snapshot vs gbstats prediction):")
+    for e in report.experiments:
+        status = "OK" if e.ok else "MISMATCH"
+        print(
+            f"  {e.key:<26} [{e.status:<7}] predicted CTW={e.expected_ctw:.1%}  "
+            f"live={e.live_ctw:.1%}  srm={e.srm:.3f}  {status}"
+        )
+    print(
+        "\n"
+        + (
+            "PASS: live results match the scripted outcomes."
+            if report.ok
+            else "FAIL: a live result diverged from its prediction."
+        )
+    )
+    return 0 if report.ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gbsynth", description="Synthetic GrowthBook demo data")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    for name, func in (("generate", cmd_generate), ("load", cmd_load)):
+    commands = (("generate", cmd_generate), ("load", cmd_load), ("provision", cmd_provision))
+    for name, func in commands:
         p = sub.add_parser(name, help=func.__doc__)
         p.add_argument("vertical", nargs="?", default="saas", help="vertical name (default: saas)")
         p.add_argument("--spec", help="explicit path to a vertical YAML (overrides vertical)")

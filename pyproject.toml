@@ -13,6 +13,8 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.5.3",
     "pyyaml>=6.0",
+    "pycryptodome>=3.23.0",
+    "pymongo>=4.17.0",
 ]
 
 [project.scripts]
