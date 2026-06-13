@@ -1,0 +1,16 @@
+# Claude Code local session config
+.claude/
+
+# Python (uv-managed)
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.*
+
+# OS
+.DS_Store
