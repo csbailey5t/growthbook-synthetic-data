@@ -143,6 +143,18 @@ def cmd_refresh(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cleanup(args: argparse.Namespace) -> int:
+    from gbsynth.cleanup import cleanup
+
+    spec = VerticalSpec.from_yaml(_spec_path(args))
+    print(f"Tearing down '{spec.name}' (objects + warehouse db)...")
+    removed = cleanup(spec.name, drop_warehouse=not args.keep_warehouse)
+    for k, v in removed.items():
+        print(f"  {k:<22} {v}")
+    print(f"\nDone. Rebuild with `gbsynth provision {spec.name}`.")
+    return 0
+
+
 def cmd_snapshot(args: argparse.Namespace) -> int:
     from gbsynth.reset import snapshot
 
@@ -198,6 +210,12 @@ def main(argv: list[str] | None = None) -> int:
     reset.add_argument("name", nargs="?", default=None, help="snapshot name (default: newest)")
     reset.add_argument("--list", action="store_true", help="list snapshots instead of restoring")
     reset.set_defaults(func=cmd_reset)
+
+    clean = sub.add_parser("cleanup", help="tear down one vertical's objects + warehouse db")
+    clean.add_argument("vertical", nargs="?", default="saas")
+    clean.add_argument("--spec", help="explicit path to a vertical YAML")
+    clean.add_argument("--keep-warehouse", action="store_true", help="keep the warehouse database")
+    clean.set_defaults(func=cmd_cleanup)
 
     args = parser.parse_args(argv)
     return args.func(args)
