@@ -17,11 +17,16 @@ uv sync
 
 uv run gbsynth generate saas         # build + verify story outcomes via gbstats (no DB)
 uv run gbsynth load saas             # + load into Postgres   (--warehouse clickhouse)
-uv run gbsynth provision saas        # + build the live GrowthBook project (needs GB_API_KEY)
+uv run gbsynth provision saas        # + build the live GrowthBook project (--warehouse clickhouse)
+uv run gbsynth refresh saas          # advance data + results to today (rolling freshness)
 uv run gbsynth verify saas           # pre-demo health check of the live workspace
+uv run gbsynth snapshot golden       # dump a golden Mongo state
+uv run gbsynth reset golden          # revert the org after a demo
+uv run gbsynth cleanup saas          # tear down one vertical to rebuild it
 ```
 
-Verticals: `saas`, `ecom`, `b2b`, `fintech` (each `config/verticals/<name>.yaml`).
+Verticals: `saas`, `ecom`, `b2b`, `fintech`, `ai` (each `config/verticals/<name>.yaml`).
+See `docs/demo-runbook.md` for the sales/marketing demo guide.
 
 ## How it works
 
@@ -47,14 +52,14 @@ Verticals: `saas`, `ecom`, `b2b`, `fintech` (each `config/verticals/<name>.yaml`
 |---|---|
 | 0 — validation spike | done (`phase0/`) |
 | 1 — engine + SaaS, gbstats-verified | done |
-| 2 — provisioner (data source bootstrap, metrics, experiments) | done (local; Fly deploy deferred) |
-| 3 — all four verticals + ClickHouse + multi-vertical provisioning | done |
-| 4 — `verify`; refresh + lifecycle rotation + reset automation | `verify` done; rest pending |
+| 2 — provisioner (data source bootstrap, metrics, experiments, **flags**) | done (local) |
+| 3 — five verticals (incl. **AI**) + ClickHouse + multi-vertical provisioning (either warehouse) | done |
+| 4 — `verify`, `refresh`, `snapshot`/`reset` | done (cron is Fly-side) |
+| 5 — `cleanup`, demo runbook | done (retention pruning + SDK connections pending) |
 
-**Remaining (Fly-independent):** feature-flag catalog + provisioning; SDK connections;
-the `refresh` command + experiment lifecycle rotation; graduating `reset`/`snapshot` into
-the package; ClickHouse data-source provisioning; demo runbooks + cleanup/pruning.
-**Blocked on Fly creds:** the actual Fly deployment only.
+**Remaining (Fly-independent, minor):** retention pruning of old warehouse partitions;
+SDK connections; true story rotation in `refresh`. **Blocked on Fly creds:** the Fly
+deployment + the GitHub Actions nightly cron (reset → refresh → verify → snapshot).
 
 ## Tooling
 
