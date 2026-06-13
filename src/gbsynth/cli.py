@@ -128,17 +128,37 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_snapshot(args: argparse.Namespace) -> int:
+    from gbsynth.reset import snapshot
+
+    snapshot(args.name, exclude_cache=args.exclude_cache)
+    return 0
+
+
+def cmd_reset(args: argparse.Namespace) -> int:
+    from gbsynth.reset import list_snapshots, restore
+
+    if args.list:
+        snaps = list_snapshots()
+        print("Snapshots:" if snaps else "No snapshots yet.")
+        for p in snaps:
+            print(f"  {p.name}  ({p.stat().st_size:,} bytes)")
+        return 0
+    restore(args.name)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gbsynth", description="Synthetic GrowthBook demo data")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    commands = (
+    vertical_cmds = (
         ("generate", cmd_generate),
         ("load", cmd_load),
         ("provision", cmd_provision),
         ("verify", cmd_verify),
     )
-    for name, func in commands:
+    for name, func in vertical_cmds:
         p = sub.add_parser(name, help=func.__doc__)
         p.add_argument("vertical", nargs="?", default="saas", help="vertical name (default: saas)")
         p.add_argument("--spec", help="explicit path to a vertical YAML (overrides vertical)")
@@ -151,6 +171,16 @@ def main(argv: list[str] | None = None) -> int:
                 help="target warehouse (default: postgres)",
             )
         p.set_defaults(func=func)
+
+    snap = sub.add_parser("snapshot", help="dump a golden Mongo snapshot")
+    snap.add_argument("name", nargs="?", default="golden")
+    snap.add_argument("--exclude-cache", action="store_true", help="drop recomputable query cache")
+    snap.set_defaults(func=cmd_snapshot)
+
+    reset = sub.add_parser("reset", help="restore Mongo from a golden snapshot")
+    reset.add_argument("name", nargs="?", default=None, help="snapshot name (default: newest)")
+    reset.add_argument("--list", action="store_true", help="list snapshots instead of restoring")
+    reset.set_defaults(func=cmd_reset)
 
     args = parser.parse_args(argv)
     return args.func(args)
