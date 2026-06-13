@@ -59,19 +59,25 @@ class StoryOutcome:
     in_band: bool
 
 
-def _per_user(exposures: list[Exposure], events: list[Event]) -> dict[str, dict]:
-    """Aggregate to one row per exposed user: variation, activated flag, MRR sum."""
+def _per_user(
+    spec: VerticalSpec, exposures: list[Exposure], events: list[Event]
+) -> dict[str, dict]:
+    """Aggregate to one row per exposed user: variation, conversion flag, value sum."""
+    conversion_event = spec.conversion_metric.event
+    value_metric = spec.value_metric
+    value_event = value_metric.event if value_metric else None
+
     rows: dict[str, dict] = {
-        e.user.user_id: {"variation": e.variation, "activated": 0, "mrr": 0.0} for e in exposures
+        e.user.user_id: {"variation": e.variation, "converted": 0, "value": 0.0} for e in exposures
     }
     for ev in events:
         row = rows.get(ev.user_id)
         if row is None:
             continue
-        if ev.event == "activated":
-            row["activated"] = 1
-        elif ev.event == "subscribed" and ev.value is not None:
-            row["mrr"] += ev.value
+        if ev.event == conversion_event:
+            row["converted"] = 1
+        elif ev.event == value_event and ev.value is not None:
+            row["value"] += ev.value
     return rows
 
 
@@ -85,13 +91,13 @@ def _stat(metric_type: str, values: list[float]):
 def verify_story(
     spec: VerticalSpec, story: Story, exposures: list[Exposure], events: list[Event]
 ) -> list[StoryOutcome]:
-    rows = _per_user(exposures, events)
+    rows = _per_user(spec, exposures, events)
     control = [r for r in rows.values() if r["variation"] == 0]
     treatment = [r for r in rows.values() if r["variation"] != 0]
 
     outcomes: list[StoryOutcome] = []
     for metric in spec.metrics:
-        col = "activated" if metric.type == "proportion" else "mrr"
+        col = "converted" if metric.type == "proportion" else "value"
         c_vals = [float(r[col]) for r in control]
         t_vals = [float(r[col]) for r in treatment]
         c_stat, t_stat = _stat(metric.type, c_vals), _stat(metric.type, t_vals)
@@ -120,9 +126,9 @@ def verify_story(
 
 
 def blended_base(spec: VerticalSpec) -> float:
-    """Population-weighted base activation rate (the control-arm expectation)."""
+    """Population-weighted base conversion rate (the control-arm expectation)."""
     pw = sum(p.weight for p in spec.personas)
-    return sum(p.weight / pw * p.activation_base for p in spec.personas)
+    return sum(p.weight / pw * p.conversion_base for p in spec.personas)
 
 
 def _expected_ctw(base: float, lift: float, n_per_arm: int) -> float:

@@ -1,0 +1,75 @@
+# E-commerce vertical. Shipped on the Segment shape first (PLAN.md:316 scope lever);
+# the GA4-flavored flat schema is a fast-follow. High traffic, low conversion — so a
+# larger population keeps the solved lifts believable.
+
+name: ecom
+seed: 42
+schema_flavor: segment
+
+scale:
+  n_users: 120000
+  months: 12
+
+personas:
+  - name: bargain
+    weight: 0.45
+    conversion_base: 0.045
+    value_log_mean: 3.7    # ~ $40 order median
+    value_log_std: 0.6
+  - name: regular
+    weight: 0.40
+    conversion_base: 0.075
+    value_log_mean: 4.2    # ~ $67
+    value_log_std: 0.6
+  - name: loyalist
+    weight: 0.15
+    conversion_base: 0.12
+    value_log_mean: 4.8    # ~ $121
+    value_log_std: 0.7
+
+metrics:
+  - key: purchase
+    name: Purchase conversion
+    type: proportion
+    event: purchased
+  - key: revenue
+    name: Revenue per user
+    type: mean
+    event: order_value
+    value_column: value
+
+stories:
+  - key: ecom-pdp-gallery
+    name: PDP image gallery
+    ends_days_ago: 0
+    phase_days: 40
+    primary_metric: purchase
+    target_chance_to_win: 0.50   # running, inconclusive so far
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+  - key: ecom-checkout-redesign
+    name: One-page checkout
+    ends_days_ago: 45
+    phase_days: 55
+    primary_metric: purchase
+    target_chance_to_win: 0.99   # win (low base => extra headroom)
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+  - key: ecom-promo-banner
+    name: Sitewide promo banner
+    ends_days_ago: 105
+    phase_days: 55
+    primary_metric: purchase
+    target_chance_to_win: 0.02   # surprise loss (low base => extra headroom)
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+
+backfill:
+  count: 5
+  phase_days: 30
+  starts_days_ago: 160
+  lift_std: 0.05
+  primary_metric: purchase

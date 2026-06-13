@@ -1,0 +1,74 @@
+# B2B SaaS vertical (account-led). Segment shape. Lower traffic, higher-value conversions
+# (demo request -> opportunity), so a smaller population than e-com suffices.
+
+name: b2b
+seed: 42
+schema_flavor: segment
+
+scale:
+  n_users: 30000
+  months: 12
+
+personas:
+  - name: smb
+    weight: 0.50
+    conversion_base: 0.16
+    value_log_mean: 8.0    # ~ $3k ACV median
+    value_log_std: 0.6
+  - name: mid_market
+    weight: 0.35
+    conversion_base: 0.22
+    value_log_mean: 9.2    # ~ $10k
+    value_log_std: 0.6
+  - name: enterprise
+    weight: 0.15
+    conversion_base: 0.28
+    value_log_mean: 10.6   # ~ $40k
+    value_log_std: 0.7
+
+metrics:
+  - key: opportunity
+    name: Demo -> opportunity
+    type: proportion
+    event: opportunity_created
+  - key: acv
+    name: ACV per account
+    type: mean
+    event: opportunity_value
+    value_column: value
+
+stories:
+  - key: b2b-demo-form-length
+    name: Shorter demo request form
+    ends_days_ago: 0
+    phase_days: 40
+    primary_metric: opportunity
+    target_chance_to_win: 0.50   # running, inconclusive (guardrail watch)
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+  - key: b2b-self-serve-trial
+    name: Self-serve trial flow
+    ends_days_ago: 45
+    phase_days: 55
+    primary_metric: opportunity
+    target_chance_to_win: 0.97   # win
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+  - key: b2b-gated-pricing
+    name: Gated pricing page
+    ends_days_ago: 105
+    phase_days: 55
+    primary_metric: opportunity
+    target_chance_to_win: 0.04   # surprise loss (hiding pricing hurt intent)
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+
+backfill:
+  count: 5
+  phase_days: 30
+  starts_days_ago: 160
+  lift_std: 0.05
+  primary_metric: opportunity

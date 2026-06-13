@@ -27,13 +27,19 @@ class Scale(BaseModel):
 
 
 class Persona(BaseModel):
-    """A behavioural archetype. `weight` is relative (normalised across personas)."""
+    """A behavioural archetype. `weight` is relative (normalised across personas).
+
+    Every vertical's funnel reduces to the same shape — a binary conversion and a value —
+    so personas are described generically: `conversion_base` is P(convert) before propensity
+    and experiment effect, and `value_log_*` are the lognormal params for the value a
+    converting user contributes (revenue, MRR, transaction volume, ...).
+    """
 
     name: str
     weight: float
-    activation_base: float = Field(ge=0.0, le=1.0)  # P(activate) before propensity/effect
-    mrr_log_mean: float  # lognormal params for monthly revenue of activated users
-    mrr_log_std: float
+    conversion_base: float = Field(ge=0.0, le=1.0)
+    value_log_mean: float
+    value_log_std: float
 
 
 class Metric(BaseModel):
@@ -103,6 +109,16 @@ class VerticalSpec(BaseModel):
 
     def metric(self, key: str) -> Metric:
         return next(m for m in self.metrics if m.key == key)
+
+    @property
+    def conversion_metric(self) -> Metric:
+        """The binary funnel metric the experiment effect is applied to."""
+        return next(m for m in self.metrics if m.type == "proportion")
+
+    @property
+    def value_metric(self) -> Metric | None:
+        """The per-user value metric (revenue/MRR/volume), if the vertical has one."""
+        return next((m for m in self.metrics if m.type == "mean"), None)
 
     @classmethod
     def from_yaml(cls, path: str) -> VerticalSpec:

@@ -1,0 +1,74 @@
+# Fintech vertical (application -> funding funnel). Segment shape first; the custom flat
+# schema is a fast-follow. Medium traffic, mid-range conversion.
+
+name: fintech
+seed: 42
+schema_flavor: segment
+
+scale:
+  n_users: 70000
+  months: 12
+
+personas:
+  - name: thin_file
+    weight: 0.40
+    conversion_base: 0.30
+    value_log_mean: 6.6    # ~ $735 first-month volume median
+    value_log_std: 0.7
+  - name: prime
+    weight: 0.45
+    conversion_base: 0.48
+    value_log_mean: 7.3    # ~ $1480
+    value_log_std: 0.6
+  - name: premier
+    weight: 0.15
+    conversion_base: 0.58
+    value_log_mean: 8.1    # ~ $3290
+    value_log_std: 0.7
+
+metrics:
+  - key: funding
+    name: Application -> funded
+    type: proportion
+    event: account_funded
+  - key: txn_volume
+    name: Transaction volume per user
+    type: mean
+    event: txn_volume
+    value_column: value
+
+stories:
+  - key: fintech-card-activation-nudge
+    name: Card activation nudge
+    ends_days_ago: 0
+    phase_days: 40
+    primary_metric: funding
+    target_chance_to_win: 0.50   # running, inconclusive
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+  - key: fintech-simplified-kyc
+    name: Simplified KYC flow
+    ends_days_ago: 45
+    phase_days: 55
+    primary_metric: funding
+    target_chance_to_win: 0.97   # win
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+  - key: fintech-fee-disclosure
+    name: Upfront fee disclosure
+    ends_days_ago: 105
+    phase_days: 55
+    primary_metric: funding
+    target_chance_to_win: 0.04   # surprise loss (sticker shock)
+    variations:
+      - {key: "0", name: Control}
+      - {key: "1", name: Treatment}
+
+backfill:
+  count: 5
+  phase_days: 30
+  starts_days_ago: 160
+  lift_std: 0.05
+  primary_metric: funding

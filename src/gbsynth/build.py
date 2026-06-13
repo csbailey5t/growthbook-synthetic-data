@@ -70,7 +70,7 @@ def build_dataset(spec: VerticalSpec, now: dt.datetime | None = None) -> Dataset
             sum(1 for e in exposures if e.variation != 0),
         )
         lift = resolve_lift(spec, story, n_per_arm)
-        events = build_events(story, exposures, lift, rng, now)
+        events = build_events(spec, story, exposures, lift, rng, now)
         outcomes = verify_story(spec, story, exposures, events)
         expected_ctw = design_check(spec, story, lift, n_per_arm)
 

@@ -16,19 +16,19 @@ scale:
 personas:
   - name: smb
     weight: 0.55
-    activation_base: 0.34
-    mrr_log_mean: 3.4   # ~ $30/mo median
-    mrr_log_std: 0.5
+    conversion_base: 0.34
+    value_log_mean: 3.4   # ~ $30/mo median
+    value_log_std: 0.5
   - name: mid_market
     weight: 0.35
-    activation_base: 0.45
-    mrr_log_mean: 4.6   # ~ $100/mo median
-    mrr_log_std: 0.5
+    conversion_base: 0.45
+    value_log_mean: 4.6   # ~ $100/mo median
+    value_log_std: 0.5
   - name: enterprise
     weight: 0.10
-    activation_base: 0.52
-    mrr_log_mean: 5.9   # ~ $365/mo median
-    mrr_log_std: 0.6
+    conversion_base: 0.52
+    value_log_mean: 5.9   # ~ $365/mo median
+    value_log_std: 0.6
 
 metrics:
   - key: activation

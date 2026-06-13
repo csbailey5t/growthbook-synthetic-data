@@ -8,6 +8,7 @@ split (no SRM). DB-free: pure generation + gbstats.
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,19 @@ from gbsynth.build import build_dataset
 from gbsynth.spec import Metric, Persona, Scale, Story, Variation, VerticalSpec
 
 NOW = dt.datetime(2026, 6, 13, tzinfo=dt.UTC)
+VERTICAL_SPECS = sorted(
+    (Path(__file__).resolve().parent.parent / "config" / "verticals").glob("*.yaml")
+)
+
+
+@pytest.mark.parametrize("spec_path", VERTICAL_SPECS, ids=lambda p: p.stem)
+def test_vertical_decisive_stories_verify(spec_path: Path) -> None:
+    """Every shipped vertical's decisive (win/loss) stories land in band via gbstats."""
+    spec = VerticalSpec.from_yaml(str(spec_path))
+    dataset = build_dataset(spec, now=NOW)
+    primaries = [o for o in dataset.outcomes if o.is_primary]
+    bad = [(o.metric_key, round(o.chance_to_win, 3)) for o in primaries if not o.in_band]
+    assert not bad, f"{spec_path.stem}: out-of-band {bad}"
 
 
 def _slice_spec(n_users: int = 20_000) -> VerticalSpec:
@@ -24,10 +38,10 @@ def _slice_spec(n_users: int = 20_000) -> VerticalSpec:
         scale=Scale(n_users=n_users, months=12),
         personas=[
             Persona(
-                name="smb", weight=0.6, activation_base=0.34, mrr_log_mean=3.4, mrr_log_std=0.5
+                name="smb", weight=0.6, conversion_base=0.34, value_log_mean=3.4, value_log_std=0.5
             ),
             Persona(
-                name="ent", weight=0.4, activation_base=0.50, mrr_log_mean=5.0, mrr_log_std=0.6
+                name="ent", weight=0.4, conversion_base=0.50, value_log_mean=5.0, value_log_std=0.6
             ),
         ],
         metrics=[

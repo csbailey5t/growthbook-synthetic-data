@@ -48,9 +48,9 @@ class User:
     user_id: str
     anonymous_id: str
     persona: str
-    activation_base: float  # persona base, captured for convenience
-    mrr_log_mean: float
-    mrr_log_std: float
+    conversion_base: float  # persona base, captured for convenience
+    value_log_mean: float
+    value_log_std: float
     propensity: float  # stable latent multiplier (~1)
     signup_at: dt.datetime
     country: str
@@ -105,9 +105,9 @@ def build_users(spec: VerticalSpec, now: dt.datetime, rng: np.random.Generator) 
                 user_id=f"u_{i:06d}",
                 anonymous_id=f"anon_{i:06d}",
                 persona=p.name,
-                activation_base=p.activation_base,
-                mrr_log_mean=p.mrr_log_mean,
-                mrr_log_std=p.mrr_log_std,
+                conversion_base=p.conversion_base,
+                value_log_mean=p.value_log_mean,
+                value_log_std=p.value_log_std,
                 propensity=float(propensity[i]),
                 signup_at=signup_at[i]
                 .astype("datetime64[s]")
