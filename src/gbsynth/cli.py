@@ -128,6 +128,21 @@ def cmd_verify(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_refresh(args: argparse.Namespace) -> int:
+    from gbsynth.refresh import refresh
+
+    spec = VerticalSpec.from_yaml(_spec_path(args))
+    print(f"Refreshing '{spec.name}' to current dates...")
+    result = refresh(spec)
+    print("Reloaded:", ", ".join(f"{k}={v:,}" for k, v in result["loaded"].items()))
+    print(f"Re-snapshotted: {len(result['snapshotted'])} experiments")
+    if result["missing"]:
+        print(f"Not yet provisioned (run `gbsynth provision {spec.name}`): {result['missing']}")
+        return 1
+    print("\nPASS: workspace data + results are current.")
+    return 0
+
+
 def cmd_snapshot(args: argparse.Namespace) -> int:
     from gbsynth.reset import snapshot
 
@@ -157,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         ("load", cmd_load),
         ("provision", cmd_provision),
         ("verify", cmd_verify),
+        ("refresh", cmd_refresh),
     )
     for name, func in vertical_cmds:
         p = sub.add_parser(name, help=func.__doc__)
