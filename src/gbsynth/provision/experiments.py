@@ -46,10 +46,20 @@ def _phase(story: Story, now: dt.datetime) -> dict:
 
 
 def _find(client: GBClient, tracking_key: str) -> dict | None:
-    for e in client.get("/experiments").get("experiments", []):
-        if e.get("trackingKey") == tracking_key:
-            return e
-    return None
+    """Look up an experiment by tracking key, paginating the list endpoint.
+
+    The list is paged (default ~10/page), so checking only the first page misses
+    experiments once the org has several — which would also break idempotent re-runs.
+    """
+    offset = 0
+    while True:
+        page = client.get("/experiments", params={"limit": 100, "offset": offset})
+        for e in page.get("experiments", []):
+            if e.get("trackingKey") == tracking_key:
+                return e
+        if not page.get("hasMore"):
+            return None
+        offset = page.get("nextOffset") or offset + 100
 
 
 def _create(

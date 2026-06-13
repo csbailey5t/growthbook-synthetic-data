@@ -110,11 +110,33 @@ def cmd_provision(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    from gbsynth.provision.verify import verify
+
+    spec = VerticalSpec.from_yaml(_spec_path(args))
+    print(f"Verifying '{spec.name}' workspace health...")
+    results = verify(spec)
+    for r in results:
+        if not r.found:
+            print(f"  {r.key:<28} NOT PROVISIONED")
+            continue
+        flag = "OK" if r.healthy else "UNHEALTHY"
+        print(f"  {r.key:<28} CTW={r.live_ctw:.1%}  srm={r.srm:.3f}  {flag} ({r.note})")
+    ok = all(r.healthy for r in results)
+    print("\n" + ("PASS: workspace is demo-ready." if ok else "FAIL: workspace needs attention."))
+    return 0 if ok else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="gbsynth", description="Synthetic GrowthBook demo data")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    commands = (("generate", cmd_generate), ("load", cmd_load), ("provision", cmd_provision))
+    commands = (
+        ("generate", cmd_generate),
+        ("load", cmd_load),
+        ("provision", cmd_provision),
+        ("verify", cmd_verify),
+    )
     for name, func in commands:
         p = sub.add_parser(name, help=func.__doc__)
         p.add_argument("vertical", nargs="?", default="saas", help="vertical name (default: saas)")
