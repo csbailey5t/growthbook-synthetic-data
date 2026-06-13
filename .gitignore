@@ -11,6 +11,14 @@ dist/
 # Env / secrets
 .env
 .env.*
+!.env.example
+
+# Mongo golden dumps + captured data-source doc (holds ENCRYPTION_KEY-bound creds)
+snapshots/
+phase0/captured_datasource.json
+
+# Playwright MCP session artifacts
+.playwright-mcp/
 
 # OS
 .DS_Store

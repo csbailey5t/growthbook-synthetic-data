@@ -1,0 +1,67 @@
+# Phase 0 validation-spike stack — local only (no Fly.io).
+# growthbook + mongo + postgres. ClickHouse is deliberately out of scope until Phase 3.
+#
+# Image is pinned to 4.4.0 — the version PLAN.md's API research was verified against
+# (PLAN.md:24-26) and consistent with the "never auto-latest" hosting rule (PLAN.md:330).
+# Secrets come from .env (see .env.example); ENCRYPTION_KEY must stay stable across
+# restarts because it encrypts data-source credentials in Mongo (PLAN.md:240).
+
+services:
+  mongo:
+    image: "mongo:8.0"
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+    ports:
+      # Exposed so reset.py can run mongodump/mongorestore from the host.
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: "postgres:16"
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      # Exposed so the host-side generator (phase0/generate.py) can load data.
+      # GrowthBook itself reaches Postgres over the compose network at host "postgres".
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  growthbook:
+    image: "growthbook/growthbook:4.4.0"
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # front-end
+      - "3100:3100"  # API
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo:27017/growthbook?authSource=admin
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - APP_ORIGIN=http://localhost:3000
+      - API_HOST=http://localhost:3100
+    volumes:
+      - uploads:/usr/local/src/app/packages/back-end/uploads
+
+volumes:
+  mongodata:
+  pgdata:
+  uploads:
