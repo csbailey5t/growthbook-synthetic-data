@@ -1,0 +1,106 @@
+# AI-native SaaS vertical: an AI support copilot. Experiments here test prompts, model
+# swaps, and retrieval settings rather than UI — and the model/prompt config ships as
+# JSON-valued feature flags (spec.flags below), with experiment-ref flags linking the
+# model/prompt A/B tests. Segment shape. Deflection rates are high, so decisive stories
+# are reliable at medium scale.
+
+name: ai
+seed: 42
+schema_flavor: segment
+
+scale:
+  n_users: 40000
+  months: 12
+
+# "Conversion" == the AI resolved the query without escalating to a human (deflection).
+# "Value" == automation savings ($) booked on a resolved session.
+personas:
+  - name: free
+    weight: 0.50
+    conversion_base: 0.55
+    value_log_mean: 1.8    # ~ $6 saved median
+    value_log_std: 0.6
+  - name: pro
+    weight: 0.35
+    conversion_base: 0.62
+    value_log_mean: 2.7    # ~ $15
+    value_log_std: 0.6
+  - name: enterprise
+    weight: 0.15
+    conversion_base: 0.68
+    value_log_mean: 3.7    # ~ $40
+    value_log_std: 0.7
+
+metrics:
+  - key: deflection
+    name: AI deflection rate
+    type: proportion
+    event: query_resolved
+  - key: automation_savings
+    name: Automation savings per user
+    type: mean
+    event: resolution_logged
+    value_column: value
+
+stories:
+  # Live: retrieval-config test (8k vs 16k context window), inconclusive so far.
+  - key: ai-rag-context-window
+    name: RAG context window 8k vs 16k
+    ends_days_ago: 0
+    phase_days: 40
+    primary_metric: deflection
+    target_chance_to_win: 0.50
+    variations:
+      - {key: "0", name: 8k context}
+      - {key: "1", name: 16k context}
+  # Win: model swap improves deflection.
+  - key: ai-model-swap-sonnet
+    name: Claude Sonnet 4.5 vs GPT-4o
+    ends_days_ago: 45
+    phase_days: 55
+    primary_metric: deflection
+    target_chance_to_win: 0.97
+    variations:
+      - {key: "0", name: GPT-4o}
+      - {key: "1", name: Claude Sonnet 4.5}
+  # Surprise loss: an aggressive auto-resolve prompt closed tickets users weren't done with.
+  - key: ai-eager-autoresolve-prompt
+    name: Eager auto-resolve prompt
+    ends_days_ago: 105
+    phase_days: 55
+    primary_metric: deflection
+    target_chance_to_win: 0.04
+    variations:
+      - {key: "0", name: Control prompt}
+      - {key: "1", name: Eager prompt}
+
+backfill:
+  count: 5
+  phase_days: 30
+  starts_days_ago: 160
+  lift_std: 0.05
+  primary_metric: deflection
+
+# AI config shipped as flags — the thing this vertical demos. JSON values hold model and
+# retrieval config; the experiment-ref flags (auto-generated) gate the model/prompt tests.
+flags:
+  - id: ai-model-config
+    description: Active model + decoding params for the copilot.
+    value_type: json
+    default_value: '{"model":"claude-sonnet-4-5","temperature":0.2,"max_output_tokens":1024}'
+    tags: [ai-config, model]
+  - id: ai-system-prompt-version
+    description: System prompt template version served to the copilot.
+    value_type: string
+    default_value: "v3"
+    tags: [ai-config, prompt]
+  - id: ai-rag-settings
+    description: Retrieval settings (top-k, rerank, context tokens).
+    value_type: json
+    default_value: '{"top_k":8,"rerank":true,"context_tokens":8000}'
+    tags: [ai-config, rag]
+  - id: ai-response-streaming
+    description: Stream tokens to the client (kill switch).
+    value_type: boolean
+    default_value: "true"
+    tags: [ai-config, killswitch]
