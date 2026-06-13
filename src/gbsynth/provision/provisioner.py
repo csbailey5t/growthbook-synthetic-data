@@ -19,6 +19,7 @@ from gbsynth.provision import config
 from gbsynth.provision.bootstrap import bootstrap_datasource
 from gbsynth.provision.client import GBClient
 from gbsynth.provision.experiments import ExperimentResult, provision_experiment
+from gbsynth.provision.features import provision_features
 from gbsynth.provision.metrics import import_metrics
 from gbsynth.provision.workspace import ensure_project
 from gbsynth.spec import VerticalSpec
@@ -30,6 +31,7 @@ class ProvisionReport:
     datasource_id: str
     experiments: list[ExperimentResult]
     loaded: dict[str, int]
+    features_created: int = 0
 
     @property
     def ok(self) -> bool:
@@ -73,4 +75,5 @@ def provision(spec: VerticalSpec, now: dt.datetime | None = None) -> ProvisionRe
         )
         for r in dataset.extra["story_results"]
     ]
-    return ProvisionReport(project_id, datasource_id, experiments, loaded)
+    features_created = provision_features(client, project_id, spec)
+    return ProvisionReport(project_id, datasource_id, experiments, loaded, features_created)

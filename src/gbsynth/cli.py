@@ -92,6 +92,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
     report = provision(spec)
     print(f"\nProject {report.project_id}  ·  data source {report.datasource_id}")
     print("Loaded:", ", ".join(f"{k}={v:,}" for k, v in report.loaded.items()))
+    print(f"Feature flags created: {report.features_created}")
     print("\nExperiments (live snapshot vs gbstats prediction):")
     for e in report.experiments:
         status = "OK" if e.ok else "MISMATCH"
