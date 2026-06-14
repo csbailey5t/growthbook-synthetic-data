@@ -26,7 +26,14 @@ uv run gbsynth cleanup saas          # tear down one vertical to rebuild it
 ```
 
 Verticals: `saas`, `ecom`, `b2b`, `fintech`, `ai` (each `config/verticals/<name>.yaml`).
-See `docs/demo-runbook.md` for the sales/marketing demo guide.
+
+## Documentation
+
+- `docs/demo-runbook.md` — sales/marketing demo guide (what to show, per vertical; daily ops)
+- `docs/adding-a-vertical.md` — extend with a new vertical + full spec-field reference
+- `CLAUDE.md` — dev conventions, commands, architecture map, and gotchas
+- `docs/phase-2.md`, `phase0/README.md` — provisioner and validation-spike deep-dives
+- `PLAN.md` — the full design; `gbsynth <cmd> --help` — per-command flags
 
 ## How it works
 
